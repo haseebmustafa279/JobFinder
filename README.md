@@ -40,3 +40,24 @@ src/
 
 ```bash
 npm install
+
+npm start
+
+npm run android / npm run ios
+
+Firebase Setup:
+
+Create Firebase project
+
+Enable Email/Password authentication
+
+Add Android/iOS app
+
+Add google-services.json / GoogleService-Info.plist
+
+Enable Firestore Database
+
+
+Author
+
+Muhammad Haseeb
