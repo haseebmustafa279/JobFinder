@@ -4,11 +4,11 @@ import { COLORS, SIZES } from '../../constants/theme';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 
-const JOBS = [
+/*const JOBS = [
   { id: '1', title: 'Android Developer', company: 'Tech Corp', location: 'Lahore', type: 'Full-time', salary: '100k - 150k' },
   { id: '2', title: 'React Native Internee', company: 'OZ Tech Stack', location: 'Remote', type: 'Internship', salary: '25k - 40k' },
   { id: '3', title: 'Junior Software Engineer', company: 'Devsinc', location: 'Lahore', type: 'Full-time', salary: '80k - 120k' },
-];
+];*/
 
 const CandidateHomeScreen = ({ navigation, route }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,14 +16,25 @@ const CandidateHomeScreen = ({ navigation, route }: any) => {
   const [profileEmail, setProfileEmail] = useState<string | null>(null);
   const userRole = route.params?.role ?? 'candidate';
   const displayName = profileName ?? (userRole.charAt(0).toUpperCase() + userRole.slice(1));
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredJobs = JOBS.filter((job) => {
+  /*const filteredJobs = JOBS.filter((job) => {
     const searchTerm = searchQuery.toLowerCase();
     return (
       job.title.toLowerCase().includes(searchTerm) ||
       job.company.toLowerCase().includes(searchTerm)
     );
+  });*/
+
+  const filteredJobs = jobs.filter((job) => {
+    const searchTerm = searchQuery.toLowerCase();
+    return (
+      job.title?.toLowerCase().includes(searchTerm) ||
+      job.company?.toLowerCase().includes(searchTerm)
+    );
   });
+
 
   const renderJobItem = ({ item }: any) => (
     <TouchableOpacity
@@ -54,7 +65,7 @@ const CandidateHomeScreen = ({ navigation, route }: any) => {
     </TouchableOpacity>
   );
 
-  useEffect(() => {
+  /*useEffect(() => {
     const fetchProfile = async () => {
       try {
         const u = auth().currentUser;
@@ -74,8 +85,70 @@ const CandidateHomeScreen = ({ navigation, route }: any) => {
     };
 
     fetchProfile();
+  }, []);*/
+
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const u = auth().currentUser;
+        if (!u) return;
+
+        const snap = await firestore()
+          .collection('users')
+          .doc(u.uid)
+          .get();
+
+        if (snap.exists()) {
+          const data = snap.data() as any;
+
+          setProfileName(
+            data.name ?? u.displayName ?? u.email ?? null
+          );
+
+          setProfileEmail(
+            data.email ?? u.email ?? null
+          );
+        } else {
+          setProfileName(u.displayName ?? u.email ?? null);
+          setProfileEmail(u.email ?? null);
+        }
+      } catch (err) {
+        console.warn('Failed to load candidate profile:', err);
+      }
+    };
+
+    fetchProfile();
+
+    // 🔥 Real-time job listener
+    const unsubscribe = firestore()
+      .collection('jobs')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(
+        snapshot => {
+          if (!snapshot.empty) {
+            const jobsList = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+
+            setJobs(jobsList);
+          } else {
+            setJobs([]);
+          }
+
+          setLoading(false);
+        },
+        error => {
+          console.warn('Error fetching jobs:', error);
+          setLoading(false);
+        }
+      );
+
+    return () => unsubscribe(); // cleanup listener
   }, []);
-  
+
+
 
   return (
     <View style={styles.container}>
@@ -117,7 +190,7 @@ const CandidateHomeScreen = ({ navigation, route }: any) => {
         {searchQuery ? `Results for "${searchQuery}"` : 'Popular Jobs'}
       </Text>
 
-      <FlatList
+      {/*<FlatList
         data={filteredJobs}
         keyExtractor={(item) => item.id}
         renderItem={renderJobItem}
@@ -128,7 +201,23 @@ const CandidateHomeScreen = ({ navigation, route }: any) => {
             <Text style={{ color: COLORS.textSecondary }}>No jobs found matching your search.</Text>
           </View>
         )}
+      />*/}
+
+      <FlatList
+        data={filteredJobs}
+        keyExtractor={(item) => item.id}
+        renderItem={renderJobItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        ListEmptyComponent={() => (
+          <View style={{ alignItems: 'center', marginTop: 50 }}>
+            <Text style={{ color: COLORS.textSecondary }}>
+              {loading ? 'Loading jobs...' : 'No jobs available.'}
+            </Text>
+          </View>
+        )}
       />
+
     </View>
   );
 };
@@ -180,7 +269,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  
+
   welcomeSubtitle: { fontSize: 14, color: COLORS.textSecondary },
   welcomeTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.textPrimary },
   searchContainer: { flexDirection: 'row', height: 50, marginBottom: 10 },
