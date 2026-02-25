@@ -153,8 +153,6 @@ const ProfileScreen = ({ route, navigation }: any) => {
 
     const uploadResult = await response.json();
 
-    console.log("Cloudinary PDF response:", uploadResult);
-
     if (!uploadResult.secure_url) {
       throw new Error(uploadResult?.error?.message || "Upload failed");
     }
