@@ -38,7 +38,6 @@ const ProfileScreen = ({ route, navigation }: any) => {
               if (!user) return;
 
               await firestore().collection('users').doc(user.uid).delete();
-              //await storage().ref(`profileImages/${user.uid}.jpg`).delete().catch(() => { });
               try {
                 const ref = storage().ref(`profileImages/${user.uid}.jpg`);
                 await ref.getDownloadURL(); // check if exists
@@ -125,32 +124,55 @@ const ProfileScreen = ({ route, navigation }: any) => {
   };
 
   const handleResumeUpload = async () => {
-    try {
-      const res = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.pdf],
-      });
+  try {
+    const res = await DocumentPicker.pickSingle({
+      type: [DocumentPicker.types.pdf],
+      copyTo: 'cachesDirectory',
+    });
 
-      const user = auth().currentUser;
-      if (!user) return;
+    const user = auth().currentUser;
+    if (!user) return;
 
-      const reference = storage().ref(`resumes/${user.uid}.pdf`);
+    const data = new FormData();
 
-      await reference.putFile(res.uri);
+    data.append('file', {
+      uri: res.fileCopyUri || res.uri,
+      type: 'application/pdf',
+      name: `resume_${user.uid}.pdf`,
+    } as any);
 
-      const downloadURL = await reference.getDownloadURL();
+    data.append('upload_preset', Config.CLOUDINARY_UPLOAD_PRESET);
 
-      await firestore().collection('users').doc(user.uid).update({
-        resumeURL: downloadURL,
-      });
-
-      setResumeURL(downloadURL);
-      Alert.alert("Resume uploaded successfully!");
-    } catch (error) {
-      if (!DocumentPicker.isCancel(error)) {
-        Alert.alert("Error uploading resume");
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${Config.CLOUDINARY_CLOUD_NAME}/raw/upload`,
+      {
+        method: 'POST',
+        body: data,
       }
+    );
+
+    const uploadResult = await response.json();
+
+    console.log("Cloudinary PDF response:", uploadResult);
+
+    if (!uploadResult.secure_url) {
+      throw new Error(uploadResult?.error?.message || "Upload failed");
     }
-  };
+
+    await firestore().collection('users').doc(user.uid).update({
+      resumeURL: uploadResult.secure_url,
+    });
+
+    setResumeURL(uploadResult.secure_url);
+
+    Alert.alert("Resume uploaded successfully!");
+  } catch (error) {
+    console.log("Resume upload error:", error);
+    if (!DocumentPicker.isCancel(error)) {
+      Alert.alert("Error uploading resume");
+    }
+  }
+};
 
   useEffect(() => {
     const fetchProfile = async () => {
